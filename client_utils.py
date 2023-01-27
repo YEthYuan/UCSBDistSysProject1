@@ -6,40 +6,121 @@ import socket
 import sys
 import threading
 
+from utils import *
+
+
 class Client:
     def __init__(self, pid: int, username: str):
+        self.bank_addr = None
+        self.broadcast_list = None
         self.data_queue = None
         self.udp_thread = None
         self.udp_sock = None
         self.pid = pid
         self.username = username
+        self.event = threading.Event()
+
+        self.config = self.config_internet()
 
         self.blockchain = []
+        self.block_step = 0
         self.clock = 0
+        self.balance = 0
 
-        self.my_addr = self.get_my_ip_port()
+        self.my_addr = self.get_my_ip_port(self.config)
         self.host, self.port = self.my_addr
         self.init_udp_recv_settings()
         self.start_listening()
 
-    def get_my_ip_port(self) -> (str, int):
+    def transact(self, amount: int, to: str):
+        print("-" * 30)
+        print("Transaction Information:")
+        print("Amount: ", amount)
+        print("To: ", to)
+        print("-" * 30)
+        while True:
+            user_input = input("Do you want to proceed? (Y/N)")
+            if user_input.lower() == "y":
+                # proceed with the function
+                print("You have confirmed your transaction!")
+                break
+            elif user_input.lower() == "n":
+                print("You have gave up your transaction! Nothing will be changed! Don't worry!")
+                return
+            else:
+                print("Invalid input. Please enter Y or N.")
+
+        transact = self.generate_transact(sender=self.username, receiver=to, amount=amount)
+        prev_idx = 0
+        for prev_idx in range(len(self.blockchain)):
+            curr_blk = self.blockchain[prev_idx]
+            if self.compare_two(self.clock, self.pid, curr_blk['timestamp'], curr_blk['pid']) == 1:
+                break
+        prev_hash = self.calculate_sum(self.blockchain[prev_idx])
+        my_new_block = self.generate_block(transact=transact, prev_hash=prev_hash)
+        self.insert_into_chain(my_new_block)
+        while self.blockchain[self.block_step]['pid'] != self.pid:
+            pass
+        self.send_transaction_request(transact)
+
+    def print_blockchain(self) -> None:
+        """
+        Prints the input blockchain in a pretty format
+
+        Args:
+        blockchain: list: the blockchain to be printed
+
+        Returns:
+        None
+        """
+        for i, block in enumerate(self.blockchain):
+            print(f'Block {i + 1}:')
+            print(f'Timestamp: {block["timestamp"]}')
+            print(f'PID: {block["pid"]}')
+            print(f'Sender: {block["transaction"]["S"]}')
+            print(f'Receiver: {block["transaction"]["R"]}')
+            print(f'Amount: {block["transaction"]["amt"]}')
+            print(f'Previous block hash: {block["prev_block"]}')
+            print()
+
+    def get_my_ip_port(self, pre_config=None) -> (str, int):
         """
 
         :return:
         """
-        if len(sys.argv) == 3:
-            # Get "IP address" and the "port number" from argument 1 and argument 2
-            ip = sys.argv[1]
-            port = int(sys.argv[2])
-            return ip, port
+        if pre_config is None:
+            if len(sys.argv) == 3:
+                # Get "IP address" and the "port number" from argument 1 and argument 2
+                ip = sys.argv[1]
+                port = int(sys.argv[2])
+                return ip, port
+            else:
+                print("Error in getting my ip and port!")
+                exit(1)
+
         else:
-            print("Error in getting my ip and port!")
-            exit(1)
+            for client in pre_config['clients']:
+                if self.username == client['username']:
+                    ip = client['ip']
+                    port = client['port']
+                    return ip, port
 
     def calculate_sum(self, block: dict) -> str:
         cat_str = json.dumps(block).encode()
         ret = hashlib.sha256(cat_str).hexdigest()
         return ret
+
+    def config_internet(self) -> dict:
+        config = load_internet_config()
+
+        self.broadcast_list = []
+        for client in config['clients']:
+            if self.username != client['username']:
+                self.broadcast_list.append(client)
+
+        self.bank_addr = (config['server']['ip'], config['server']['port'])
+        
+        return config
 
     def generate_transact(self, sender: str, receiver: str, amount: int) -> dict:
         """
@@ -66,7 +147,7 @@ class Client:
         """
         return trans["S"], trans["R"], trans["amt"]
 
-    def generate_block_to_send(self, transact: dict, prev_hash: str) -> dict:
+    def generate_block(self, transact: dict, prev_hash: str) -> dict:
         """
         Block structure definition:
         block = {
@@ -78,7 +159,6 @@ class Client:
                 'amt': int
             },
             'prev_block': str (sha256 hash),
-            'status': ['pending', 'finished']
         }
         :param transact:
         :param prev_hash:
@@ -88,13 +168,54 @@ class Client:
             'timestamp': self.clock,
             'pid': self.pid,
             'transaction': transact,
-            'prev_block': prev_hash,
-            'status': 'pending'
+            'prev_block': prev_hash
         }
         return block
 
+    def generate_packet_to_send(self, msg_item: str, msg_type: str) -> dict:
+        """
+        Packet definition:
+        packet = {
+            'type': c->c: ['client-request', 'client-release']
+                    c->s: ['client-balreq', 'client-transact']
+                    s->c: ['server-balance', 'server-status']
+            'item': str (can be a dumped json string)
+        }
+        :param msg_item:
+        :param msg_type:
+        :return:
+        """
+        packet = {
+            'type': msg_type,
+            'item': msg_item,
+            'from': self.username
+        }
+        return packet
+
     def update_my_clock(self, new_ts: int):
+        print(f"My clock update to {new_ts}")
         self.clock = new_ts
+
+    def compare_two(self, a_ts: int, a_pid: int, b_ts: int, b_pid: int) -> int:
+        """
+
+        :param a_ts:
+        :param a_pid:
+        :param b_ts:
+        :param b_pid:
+        :return:
+        """
+        if a_ts < b_ts:
+            return -1
+        elif a_ts > b_ts:
+            return 1
+        else:
+            if a_pid < b_pid:
+                return -1
+            elif a_pid > b_pid:
+                return 1
+            else:
+                return 0
 
     def compare_clock(self, a: dict, b: dict) -> int:
         """
@@ -146,6 +267,91 @@ class Client:
             # Close the socket
             sock.close()
 
+    def broadcast_request(self, block: dict):
+        payload = json.dumps(block)
+        send_data = self.generate_packet_to_send(payload, 'client-request')
+        send_data = json.dumps(send_data)
+        for c in self.broadcast_list:
+            self.send_udp_packet(send_data, c['ip'], c['port'])
+            print(f"Request sent to {c['username']}.")
+
+    def process_request(self, payload: dict):
+        self.insert_into_chain(payload)
+        self.update_my_clock(max(payload['timestamp'], self.clock) + 1)
+
+    def broadcast_release(self, release_payload: dict):
+        self.block_step += 1
+        payload = json.dumps(release_payload)
+        send_data = self.generate_packet_to_send(payload, 'client-release')
+        send_data = json.dumps(send_data)
+        for c in self.broadcast_list:
+            self.send_udp_packet(send_data, c['ip'], c['port'])
+            print(f"Release sent to {c['username']}.")
+
+    def process_release(self, payload: dict):
+        username = payload['username']
+        status = payload['status']
+
+        if status:  # the other user's transaction succeed
+            print(f"{username}'s transaction success!")
+
+        else:  # the other user's transaction failed
+            print(f"{username}'s transaction fails!")
+
+        self.block_step += 1
+
+    def send_balance_inquery(self):
+        payload = {
+            'username': self.username
+        }
+        payload = json.dumps(payload)
+        send_data = self.generate_packet_to_send(payload, 'client-balreq')
+        send_data = json.dumps(send_data)
+        self.send_udp_packet(send_data, *self.bank_addr)
+        print("Balance inquery sent to the bank server!")
+
+    def process_balance_inquery_reply(self, reply: dict):
+        username = reply['username']
+        balance = reply['balance']
+        self.balance = balance
+        print(f"*** [Balance Inquery] ***")
+        print("The balance of your account:")
+        print("Username: ", username)
+        print("Balance: ", balance)
+
+    def send_transaction_request(self, transact: dict):
+        S, R, amount = self.get_transact(transact)
+        payload = json.dumps(transact)
+        send_data = self.generate_packet_to_send(payload, 'client-transact')
+        send_data = json.dumps(send_data)
+        self.send_udp_packet(send_data, *self.bank_addr)
+        print("Transaction request sent to the bank server!")
+        print(f"  {S} ---------- send {amount} ----------> {R}")
+
+    def process_transact_reply(self, reply: dict):
+        username = reply['username']
+        status = reply['status']
+        balance = reply['balance']
+
+        if status:  # transaction succeed
+            print("Transaction successful!")
+            print("Username: ", username)
+            print(f"Your Balance: {self.balance} -> {balance}")
+            self.balance = balance
+
+        else:  # transaction failed
+            print("Transaction failed! Maybe you should deposit more money!")
+            print("Username: ", username)
+            print(f"Your Balance: {balance}")
+            self.balance = balance
+
+        release_msg = {
+            'username': username,
+            'status': status
+        }
+
+        self.broadcast_release(release_msg)
+
     def init_udp_recv_settings(self):
         self.udp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.udp_sock.bind(self.my_addr)
@@ -167,8 +373,27 @@ class Client:
             # Do something with the received data
             # print(data.decode())
             data = json.load(data)
-            self.insert_into_chain(data)
-            self.update_my_clock(data['timestamp']+1)
+            if data['type'] == 'client-request':
+                print(f"==>Received request data from another client {data['from']}.")
+                payload = data['item']
+                payload = json.load(payload)
+                self.process_request(payload)
+            elif data['type'] == 'client-release':
+                print(f"==>Client {data['from']} sent you a release.")
+                payload = data['item']
+                payload = json.load(payload)
+                self.process_release(payload)
+            elif data['type'] == 'server-balance':
+                print("==>Bank Server replied your balance inquery!")
+                payload = data['item']
+                payload = json.load(payload)
+                self.process_balance_inquery_reply(payload)
+            elif data['type'] == 'server-status':
+                print("==>Bank Server processed your transaction, see the detail below!")
+                payload = data['item']
+                payload = json.load(payload)
+                self.process_transact_reply(payload)
+
 
 
 if __name__ == '__main__':

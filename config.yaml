@@ -3,8 +3,8 @@ server:
   port: 8000
 clients:
   - ip: 10.0.0.2
-    username: client1
+    username: Amy
     port: 8001
   - ip: 10.0.0.3
-    username: client2
+    username: Bob
     port: 8002
