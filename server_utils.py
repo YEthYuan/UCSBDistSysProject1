@@ -130,8 +130,8 @@ class Server:
     def listen_for_udp(self):
         while True:
             data, addr = self.udp_sock.recvfrom(1024)
-            print("Received data:", data)
-            print("From address:", addr)
+            # print("Received data:", data)
+            # print("From address:", addr)
             self.process_received_data(data)
 
     def init_udp_recv_settings(self):

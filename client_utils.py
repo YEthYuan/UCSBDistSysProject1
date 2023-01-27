@@ -66,7 +66,7 @@ class Client:
         prev_idx = 0
         for prev_idx in range(len(self.blockchain)):
             curr_blk = self.blockchain[prev_idx]
-            if self.compare_two(self.clock, self.pid, curr_blk['timestamp'], curr_blk['pid']) == 1:
+            if self.compare_two(curr_blk['timestamp'], curr_blk['pid'], self.clock, self.pid) == 1:
                 break
         print(f"Previous index: {prev_idx}")
         prev_hash = self.calculate_sum(self.blockchain[prev_idx])
@@ -223,8 +223,8 @@ class Client:
         :param b_pid:
         :return:
         """
-        print("Compare")
-        print(a_ts, a_pid, b_ts, b_pid)
+        # print("Compare")
+        # print(a_ts, a_pid, b_ts, b_pid)
         if a_ts < b_ts:
             return -1
         elif a_ts > b_ts:
@@ -386,8 +386,8 @@ class Client:
     def listen_for_udp(self):
         while True:
             data, addr = self.udp_sock.recvfrom(1024)
-            print("Received data:", data)
-            print("From address:", addr)
+            # print("Received data:", data)
+            # print("From address:", addr)
             self.process_recv_data(data)
 
     def process_recv_data(self, data):
