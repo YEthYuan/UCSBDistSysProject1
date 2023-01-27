@@ -22,17 +22,7 @@ class Client:
 
         self.config = self.config_internet(config)
 
-        # self.blockchain = []
-        self.blockchain = [
-            {
-                'timestamp': -1,
-                'pid': -1,
-                'transaction': {"S": "DummyBlockHead",
-                                "R": "",
-                                "amt": -1},
-                'prev_block': -1
-            },
-        ]
+        self.blockchain = self.init_blockchain()
         self.block_step = 1
         self.clock = 0
         self.balance = 0
@@ -65,24 +55,42 @@ class Client:
                 print("Invalid input. Please enter Y or N.")
 
         transact = self.generate_transact(sender=self.username, receiver=to, amount=amount)
-        prev_idx = 0
-        for prev_idx in range(len(self.blockchain)):
-            curr_blk = self.blockchain[prev_idx]
-            if self.compare_two(curr_blk['timestamp'], curr_blk['pid'], self.clock, self.pid) == 1:
-                break
-        print(f"Previous index: {prev_idx}")
-        prev_hash = self.calculate_sum(self.blockchain[prev_idx])
-        my_new_block = self.generate_block(transact=transact, prev_hash=prev_hash)
+        self.update_my_clock(self.clock + 1)
+        my_new_block = self.generate_block(transact=transact, prev_hash="")
         self.broadcast_request(my_new_block)
         self.insert_into_chain(my_new_block)
         # self.print_blockchain()
         while self.blockchain[self.block_step]['pid'] != self.pid:
             pass
         self.send_transaction_request(transact)
-        self.update_my_clock(self.clock + 1)
+
+    def init_blockchain(self) -> list:
+        ret = []
+        dummy_head = {
+            'timestamp': -1,
+            'pid': -1,
+            'transaction': {"S": "DummyBlockHead",
+                            "R": "",
+                            "amt": -1},
+            'prev_block': -1
+        }
+        ret.append(dummy_head)
+        head_hash = self.calculate_sum(dummy_head)
+        dummy_tail = {
+            'timestamp': 1e8,
+            'pid': 1e8,
+            'transaction': {"S": "DummyBlockTail",
+                            "R": "",
+                            "amt": -1},
+            'prev_block': head_hash
+        }
+        ret.append(dummy_tail)
+
+        return ret
 
     def send_fake_request(self):
         transact = self.generate_transact(sender=self.username, receiver="Fake", amount=0)
+        self.update_my_clock(self.clock + 1)
         fake_block = self.generate_block(transact, prev_hash=hashlib.sha256("Fake".encode()).hexdigest())
         self.broadcast_request(fake_block)
         self.insert_into_chain(fake_block)
@@ -90,7 +98,10 @@ class Client:
         print("!!!NOTE: THIS FUNCTION COULD ONLY BE USED IN THE DEBUG CASE!!!")
 
     def send_fake_release(self):
+        self.update_my_clock(self.clock + 1)
         release_msg = {
+            'timestamp': self.clock,
+            'pid': self.pid,
             'username': self.username,
             'status': 0
         }
@@ -299,7 +310,13 @@ class Client:
             if self.compare_clock(curr_blk, new_block) == 1:
                 break
 
-        self.blockchain = self.blockchain[:i+1] + [new_block] + self.blockchain[i+1:]
+        self.blockchain = self.blockchain[:i] + [new_block] + self.blockchain[i:]
+
+        while i < len(self.blockchain):
+            prev_hash = self.calculate_sum(block=self.blockchain[i-1])
+            self.blockchain[i]['prev_block'] = prev_hash
+
+            i += 1
 
     def send_udp_packet(self, data: str, host: str, port: int):
         """
@@ -354,6 +371,7 @@ class Client:
         else:  # the other user's transaction failed
             print(f"{username}'s transaction fails!")
 
+        self.update_my_clock(max(payload['timestamp'], self.clock) + 1)
         self.update_block_step()
 
     def send_balance_inquery(self, prompt=True):
@@ -402,7 +420,11 @@ class Client:
             print(f"Your Balance: {balance}")
             self.balance = balance
 
+        self.update_my_clock(self.clock + 1)
+
         release_msg = {
+            'timestamp': self.clock,
+            'pid': self.pid,
             'username': username,
             'status': status
         }
