@@ -1,4 +1,5 @@
 import json
+import random
 import time
 from queue import Queue
 import socket
@@ -6,7 +7,7 @@ import threading
 
 
 class Server:
-    def __init__(self, config: dict, sleep=False):
+    def __init__(self, config: dict, sleep=0):
         self.data_queue = None
         self.udp_sock = None
         self.udp_thread = None
@@ -129,8 +130,11 @@ class Server:
         send_data = self.generate_packet_to_send(json.dumps(reply), 'server-status')
         send_data = json.dumps(send_data)
 
-        if self.sleep:
-            time.sleep(0.5)
+        if self.sleep == -1:
+            sleep_time = random.uniform(0, 3)
+            time.sleep(sleep_time)
+        elif self.sleep:
+            time.sleep(self.sleep)
 
         self.send_udp_packet(send_data, *self.routes[S])
         print(f"Transact replied to {S}")

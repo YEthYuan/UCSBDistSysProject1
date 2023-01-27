@@ -1,6 +1,7 @@
 import hashlib
 import json
 import queue
+import random
 import socket
 
 import sys
@@ -11,7 +12,7 @@ from utils import *
 
 
 class Client:
-    def __init__(self, pid: int, username: str, config: dict, sleep=False):
+    def __init__(self, pid: int, username: str, config: dict, sleep=0):
         self.bank_addr = None
         self.broadcast_list = None
         self.data_queue = None
@@ -318,7 +319,7 @@ class Client:
         self.blockchain = self.blockchain[:i] + [new_block] + self.blockchain[i:]
 
         while i < len(self.blockchain):
-            prev_hash = self.calculate_sum(block=self.blockchain[i-1])
+            prev_hash = self.calculate_sum(block=self.blockchain[i - 1])
             self.blockchain[i]['prev_block'] = prev_hash
 
             i += 1
@@ -349,8 +350,11 @@ class Client:
         payload = json.dumps(block)
         send_data = self.generate_packet_to_send(payload, 'client-request')
         send_data = json.dumps(send_data)
-        if self.sleep:
-            time.sleep(0.5)
+        if self.sleep == -1:
+            sleep_time = random.uniform(0, 3)
+            time.sleep(sleep_time)
+        elif self.sleep:
+            time.sleep(self.sleep)
         for c in self.broadcast_list:
             self.send_udp_packet(send_data, c['ip'], c['port'])
             print(f"Request sent to {c['username']}.")
@@ -364,8 +368,11 @@ class Client:
         payload = json.dumps(release_payload)
         send_data = self.generate_packet_to_send(payload, 'client-release')
         send_data = json.dumps(send_data)
-        if self.sleep:
-            time.sleep(0.5)
+        if self.sleep == -1:
+            sleep_time = random.uniform(0, 3)
+            time.sleep(sleep_time)
+        elif self.sleep:
+            time.sleep(self.sleep)
         for c in self.broadcast_list:
             self.send_udp_packet(send_data, c['ip'], c['port'])
             print(f"Release sent to {c['username']}.")
@@ -390,8 +397,11 @@ class Client:
         payload = json.dumps(payload)
         send_data = self.generate_packet_to_send(payload, 'client-balreq')
         send_data = json.dumps(send_data)
-        if self.sleep:
-            time.sleep(0.5)
+        # if self.sleep == -1:
+        #     sleep_time = random.uniform(0, 3)
+        #     time.sleep(sleep_time)
+        # elif self.sleep:
+        #     time.sleep(self.sleep)
         self.send_udp_packet(send_data, *self.bank_addr)
         if prompt:
             print("Balance inquery sent to the bank server!")
@@ -410,8 +420,11 @@ class Client:
         payload = json.dumps(transact)
         send_data = self.generate_packet_to_send(payload, 'client-transact')
         send_data = json.dumps(send_data)
-        if self.sleep:
-            time.sleep(0.5)
+        if self.sleep == -1:
+            sleep_time = random.uniform(0, 3)
+            time.sleep(sleep_time)
+        elif self.sleep:
+            time.sleep(self.sleep)
         self.send_udp_packet(send_data, *self.bank_addr)
         print("Transaction request sent to the bank server!")
         print(f"  {S} ---------- send {amount} ----------> {R}")

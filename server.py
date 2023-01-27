@@ -10,7 +10,8 @@ def main():
         config_path = "./config.yaml"
     config = load_internet_config(config_path)
 
-    server = Server(config, sleep=True)
+    # sleep=-1 := sleep=rand(0,3)
+    server = Server(config, sleep=-1)
 
     while True:
         clear_screen()
