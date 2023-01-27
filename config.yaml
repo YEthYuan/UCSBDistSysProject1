@@ -1,0 +1,10 @@
+server:
+  ip: 10.0.0.1
+  port: 8000
+clients:
+  - ip: 10.0.0.2
+    username: client1
+    port: 8001
+  - ip: 10.0.0.3
+    username: client2
+    port: 8002
