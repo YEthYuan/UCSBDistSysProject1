@@ -6,11 +6,12 @@ import threading
 
 
 class Server:
-    def __init__(self, config: dict):
+    def __init__(self, config: dict, sleep=False):
         self.data_queue = None
         self.udp_sock = None
         self.udp_thread = None
         self.config = config
+        self.sleep = sleep
 
         self.routes = self.get_routes(config)
 
@@ -127,6 +128,10 @@ class Server:
 
         send_data = self.generate_packet_to_send(json.dumps(reply), 'server-status')
         send_data = json.dumps(send_data)
+
+        if self.sleep:
+            time.sleep(0.5)
+
         self.send_udp_packet(send_data, *self.routes[S])
         print(f"Transact replied to {S}")
 

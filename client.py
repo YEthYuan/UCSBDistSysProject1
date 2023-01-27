@@ -32,7 +32,7 @@ def main():
     while True:
         clear_screen()
         print(f" --- Client {username} Interface --- ")
-        print(f" < PID: {pid} Clock: {client.get_current_clock()} Balance: {client.get_current_balance()} > \n")
+        print(f" < PID: {pid} Clock: {client.get_current_clock()} Balance: {client.get_current_balance()} Step: {client.get_current_step()}> \n")
         print("1. Get Current Balance")
         print("2. Make Transaction")
         print("3. Print the Current Blockchain")

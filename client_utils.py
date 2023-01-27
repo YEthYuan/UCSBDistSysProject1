@@ -5,12 +5,13 @@ import socket
 
 import sys
 import threading
+import time
 
 from utils import *
 
 
 class Client:
-    def __init__(self, pid: int, username: str, config: dict):
+    def __init__(self, pid: int, username: str, config: dict, sleep=False):
         self.bank_addr = None
         self.broadcast_list = None
         self.data_queue = None
@@ -18,6 +19,7 @@ class Client:
         self.udp_sock = None
         self.pid = pid
         self.username = username
+        self.sleep = sleep
         self.event = threading.Event()
 
         self.config = self.config_internet(config)
@@ -77,8 +79,8 @@ class Client:
         ret.append(dummy_head)
         head_hash = self.calculate_sum(dummy_head)
         dummy_tail = {
-            'timestamp': 1e8,
-            'pid': 1e8,
+            'timestamp': sys.maxsize,
+            'pid': sys.maxsize,
             'transaction': {"S": "DummyBlockTail",
                             "R": "",
                             "amt": -1},
@@ -134,6 +136,9 @@ class Client:
 
     def get_current_balance(self):
         return self.balance
+
+    def get_current_step(self):
+        return self.block_step
 
     def set_balance(self, config: dict):
         for client in config['clients']:
@@ -344,6 +349,8 @@ class Client:
         payload = json.dumps(block)
         send_data = self.generate_packet_to_send(payload, 'client-request')
         send_data = json.dumps(send_data)
+        if self.sleep:
+            time.sleep(0.5)
         for c in self.broadcast_list:
             self.send_udp_packet(send_data, c['ip'], c['port'])
             print(f"Request sent to {c['username']}.")
@@ -357,6 +364,8 @@ class Client:
         payload = json.dumps(release_payload)
         send_data = self.generate_packet_to_send(payload, 'client-release')
         send_data = json.dumps(send_data)
+        if self.sleep:
+            time.sleep(0.5)
         for c in self.broadcast_list:
             self.send_udp_packet(send_data, c['ip'], c['port'])
             print(f"Release sent to {c['username']}.")
@@ -381,6 +390,8 @@ class Client:
         payload = json.dumps(payload)
         send_data = self.generate_packet_to_send(payload, 'client-balreq')
         send_data = json.dumps(send_data)
+        if self.sleep:
+            time.sleep(0.5)
         self.send_udp_packet(send_data, *self.bank_addr)
         if prompt:
             print("Balance inquery sent to the bank server!")
@@ -399,6 +410,8 @@ class Client:
         payload = json.dumps(transact)
         send_data = self.generate_packet_to_send(payload, 'client-transact')
         send_data = json.dumps(send_data)
+        if self.sleep:
+            time.sleep(0.5)
         self.send_udp_packet(send_data, *self.bank_addr)
         print("Transaction request sent to the bank server!")
         print(f"  {S} ---------- send {amount} ----------> {R}")
