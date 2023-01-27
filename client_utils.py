@@ -75,7 +75,7 @@ class Client:
         my_new_block = self.generate_block(transact=transact, prev_hash=prev_hash)
         self.broadcast_request(my_new_block)
         self.insert_into_chain(my_new_block)
-        self.print_blockchain()
+        # self.print_blockchain()
         while self.blockchain[self.block_step]['pid'] != self.pid:
             pass
         self.send_transaction_request(transact)
@@ -85,6 +85,7 @@ class Client:
         transact = self.generate_transact(sender=self.username, receiver="Fake", amount=0)
         fake_block = self.generate_block(transact, prev_hash=hashlib.sha256("Fake".encode()).hexdigest())
         self.broadcast_request(fake_block)
+        self.insert_into_chain(fake_block)
         print("Fake request has been broadcast, REMEMBER TO MANUALLY RELEASE AGAIN!")
         print("!!!NOTE: THIS FUNCTION COULD ONLY BE USED IN THE DEBUG CASE!!!")
 
