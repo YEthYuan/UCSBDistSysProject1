@@ -5,7 +5,6 @@ from client_utils import Client
 from utils import *
 
 
-
 def main():
     config_path = input("Input the path of config file: [./config.yaml]")
     if config_path == "":
@@ -32,12 +31,14 @@ def main():
 
     while True:
         clear_screen()
-        print(f" --- Client {username} Interface --- \n")
-        print(f" < PID: {pid}   clock: {client.get_current_clock()} > ")
+        print(f" --- Client {username} Interface --- ")
+        print(f" < PID: {pid} Clock: {client.get_current_clock()} Balance: {client.get_current_balance()} > \n")
         print("1. Get Current Balance")
         print("2. Make Transaction")
         print("3. Print the Current Blockchain")
         print()
+        print("7: [DEBUG] Manually broadcast fake request")
+        print("8: [DEBUG] Manually broadcast fake release")
         print("9: [DEBUG] Change My Clock")
         print("0. Exit")
         choice = input("Enter your choice: ")
@@ -56,6 +57,16 @@ def main():
             input()
         elif choice == '3':
             client.print_blockchain()
+            print('=' * 30)
+            print("Press enter to continue. ")
+            input()
+        elif choice == '7':
+            client.send_fake_request()
+            print('=' * 30)
+            print("Press enter to continue. ")
+            input()
+        elif choice == '8':
+            client.send_fake_release()
             print('=' * 30)
             print("Press enter to continue. ")
             input()

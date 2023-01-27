@@ -81,6 +81,22 @@ class Client:
         self.send_transaction_request(transact)
         self.update_my_clock(self.clock + 1)
 
+    def send_fake_request(self):
+        transact = self.generate_transact(sender=self.username, receiver="Fake", amount=0)
+        fake_block = self.generate_block(transact, prev_hash=hashlib.sha256("Fake".encode()).hexdigest())
+        self.broadcast_request(fake_block)
+        print("Fake request has been broadcast, REMEMBER TO MANUALLY RELEASE AGAIN!")
+        print("!!!NOTE: THIS FUNCTION COULD ONLY BE USED IN THE DEBUG CASE!!!")
+
+    def send_fake_release(self):
+        release_msg = {
+            'username': self.username,
+            'status': 0
+        }
+        self.broadcast_release(release_msg)
+        print("Fake release has been broadcast.")
+        print("!!!NOTE: THIS FUNCTION COULD ONLY BE USED IN THE DEBUG CASE!!!")
+
     def print_blockchain(self) -> None:
         """
         Prints the input blockchain in a pretty format
