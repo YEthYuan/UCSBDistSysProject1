@@ -10,7 +10,7 @@ from utils import *
 
 
 class Client:
-    def __init__(self, pid: int, username: str):
+    def __init__(self, pid: int, username: str, config: dict):
         self.bank_addr = None
         self.broadcast_list = None
         self.data_queue = None
@@ -20,10 +20,20 @@ class Client:
         self.username = username
         self.event = threading.Event()
 
-        self.config = self.config_internet()
+        self.config = self.config_internet(config)
 
-        self.blockchain = []
-        self.block_step = 0
+        # self.blockchain = []
+        self.blockchain = [
+            {
+                'timestamp': -1,
+                'pid': -1,
+                'transaction': {"S": "DummyBlockHead",
+                                "R": "",
+                                "amt": -1},
+                'prev_block': -1
+            },
+        ]
+        self.block_step = 1
         self.clock = 0
         self.balance = 0
 
@@ -31,6 +41,8 @@ class Client:
         self.host, self.port = self.my_addr
         self.init_udp_recv_settings()
         self.start_listening()
+
+        self.send_balance_inquery(prompt=False)
 
     def transact(self, amount: int, to: str):
         print("-" * 30)
@@ -56,12 +68,16 @@ class Client:
             curr_blk = self.blockchain[prev_idx]
             if self.compare_two(self.clock, self.pid, curr_blk['timestamp'], curr_blk['pid']) == 1:
                 break
+        print(f"Previous index: {prev_idx}")
         prev_hash = self.calculate_sum(self.blockchain[prev_idx])
         my_new_block = self.generate_block(transact=transact, prev_hash=prev_hash)
+        self.broadcast_request(my_new_block)
         self.insert_into_chain(my_new_block)
+        self.print_blockchain()
         while self.blockchain[self.block_step]['pid'] != self.pid:
             pass
         self.send_transaction_request(transact)
+        self.update_my_clock(self.clock + 1)
 
     def print_blockchain(self) -> None:
         """
@@ -110,16 +126,14 @@ class Client:
         ret = hashlib.sha256(cat_str).hexdigest()
         return ret
 
-    def config_internet(self) -> dict:
-        config = load_internet_config()
-
+    def config_internet(self, config: dict) -> dict:
         self.broadcast_list = []
         for client in config['clients']:
             if self.username != client['username']:
                 self.broadcast_list.append(client)
 
         self.bank_addr = (config['server']['ip'], config['server']['port'])
-        
+
         return config
 
     def generate_transact(self, sender: str, receiver: str, amount: int) -> dict:
@@ -192,6 +206,10 @@ class Client:
         }
         return packet
 
+    def update_block_step(self):
+        self.block_step += 1
+        print(f"Block step to {self.block_step}")
+
     def update_my_clock(self, new_ts: int):
         print(f"My clock update to {new_ts}")
         self.clock = new_ts
@@ -205,6 +223,8 @@ class Client:
         :param b_pid:
         :return:
         """
+        print("Compare")
+        print(a_ts, a_pid, b_ts, b_pid)
         if a_ts < b_ts:
             return -1
         elif a_ts > b_ts:
@@ -243,7 +263,7 @@ class Client:
             if self.compare_clock(curr_blk, new_block) == 1:
                 break
 
-        self.blockchain = self.blockchain[:i] + [new_block] + self.blockchain[i:]
+        self.blockchain = self.blockchain[:i+1] + [new_block] + self.blockchain[i+1:]
 
     def send_udp_packet(self, data: str, host: str, port: int):
         """
@@ -280,7 +300,7 @@ class Client:
         self.update_my_clock(max(payload['timestamp'], self.clock) + 1)
 
     def broadcast_release(self, release_payload: dict):
-        self.block_step += 1
+        self.update_block_step()
         payload = json.dumps(release_payload)
         send_data = self.generate_packet_to_send(payload, 'client-release')
         send_data = json.dumps(send_data)
@@ -298,9 +318,9 @@ class Client:
         else:  # the other user's transaction failed
             print(f"{username}'s transaction fails!")
 
-        self.block_step += 1
+        self.update_block_step()
 
-    def send_balance_inquery(self):
+    def send_balance_inquery(self, prompt=True):
         payload = {
             'username': self.username
         }
@@ -308,7 +328,8 @@ class Client:
         send_data = self.generate_packet_to_send(payload, 'client-balreq')
         send_data = json.dumps(send_data)
         self.send_udp_packet(send_data, *self.bank_addr)
-        print("Balance inquery sent to the bank server!")
+        if prompt:
+            print("Balance inquery sent to the bank server!")
 
     def process_balance_inquery_reply(self, reply: dict):
         username = reply['username']
@@ -365,35 +386,32 @@ class Client:
     def listen_for_udp(self):
         while True:
             data, addr = self.udp_sock.recvfrom(1024)
-            self.data_queue.put(data)
+            print("Received data:", data)
+            print("From address:", addr)
+            self.process_recv_data(data)
 
-    def process_recv_data(self):
-        while True:
-            data = self.data_queue.get()
-            # Do something with the received data
-            # print(data.decode())
-            data = json.load(data)
-            if data['type'] == 'client-request':
-                print(f"==>Received request data from another client {data['from']}.")
-                payload = data['item']
-                payload = json.load(payload)
-                self.process_request(payload)
-            elif data['type'] == 'client-release':
-                print(f"==>Client {data['from']} sent you a release.")
-                payload = data['item']
-                payload = json.load(payload)
-                self.process_release(payload)
-            elif data['type'] == 'server-balance':
-                print("==>Bank Server replied your balance inquery!")
-                payload = data['item']
-                payload = json.load(payload)
-                self.process_balance_inquery_reply(payload)
-            elif data['type'] == 'server-status':
-                print("==>Bank Server processed your transaction, see the detail below!")
-                payload = data['item']
-                payload = json.load(payload)
-                self.process_transact_reply(payload)
-
+    def process_recv_data(self, data):
+        data = json.loads(data)
+        if data['type'] == 'client-request':
+            print(f"==>Received request data from another client {data['from']}.")
+            payload = data['item']
+            payload = json.loads(payload)
+            self.process_request(payload)
+        elif data['type'] == 'client-release':
+            print(f"==>Client {data['from']} sent you a release.")
+            payload = data['item']
+            payload = json.loads(payload)
+            self.process_release(payload)
+        elif data['type'] == 'server-balance':
+            print("==>Bank Server replied your balance inquery!")
+            payload = data['item']
+            payload = json.loads(payload)
+            self.process_balance_inquery_reply(payload)
+        elif data['type'] == 'server-status':
+            print("==>Bank Server processed your transaction, see the detail below!")
+            payload = data['item']
+            payload = json.loads(payload)
+            self.process_transact_reply(payload)
 
 
 if __name__ == '__main__':

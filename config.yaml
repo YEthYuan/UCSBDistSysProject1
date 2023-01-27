@@ -1,10 +1,14 @@
 server:
-  ip: 10.0.0.1
+  ip: 127.0.0.1
   port: 8000
 clients:
-  - ip: 10.0.0.2
+  - ip: 127.0.0.1
     username: Amy
     port: 8001
-  - ip: 10.0.0.3
+  - ip: 127.0.0.1
     username: Bob
     port: 8002
+  - ip: 127.0.0.1
+    username: Cindy
+    port: 8003
+

@@ -6,7 +6,7 @@ def load_internet_config(path="./config.yaml") -> dict:
         config = yaml.load(file, Loader=yaml.FullLoader)
 
     print(f"==>Config file loaded from {path}!")
-    print(config)
+    # print(config)
 
     return config
 
