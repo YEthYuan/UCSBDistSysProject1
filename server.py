@@ -13,8 +13,7 @@ def main():
     server = Server(config)
 
     while True:
-        os.system('clear') # for linux/macOS
-        # os.system('cls') for Windows
+        clear_screen()
         print(f" --- Server Interface --- \n")
         print("1. Get Balance Table")
         print("2. Reset Balance Table")
@@ -32,6 +31,7 @@ def main():
             print("Press enter to continue. ")
             input()
         elif choice == '0':
+            server.stop_udp()
             print("Bye!")
             exit(1)
         else:

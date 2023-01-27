@@ -36,8 +36,10 @@ class Client:
         self.block_step = 1
         self.clock = 0
         self.balance = 0
+        self.set_balance(config)
 
-        self.my_addr = self.get_my_ip_port(self.config)
+        self.stop_udp_thread = False
+        self.my_addr = self.get_my_ip_port(config)
         self.host, self.port = self.my_addr
         self.init_udp_recv_settings()
         self.start_listening()
@@ -98,6 +100,23 @@ class Client:
             print(f'Amount: {block["transaction"]["amt"]}')
             print(f'Previous block hash: {block["prev_block"]}')
             print()
+
+    def get_current_clock(self):
+        return self.clock
+
+    def get_current_balance(self):
+        return self.balance
+
+    def set_balance(self, config: dict):
+        for client in config['clients']:
+            if self.username == client['username']:
+                self.balance = client['balance']
+                print(f"Balance: {self.balance}")
+
+    def manually_modify_clock(self, new_clock: int):
+        self.clock = new_clock
+        print(f"My Clock successfully updated to {self.clock}")
+        print("!!!NOTE: THIS FUNCTION COULD ONLY BE USED IN THE DEBUG CASE!!!")
 
     def get_my_ip_port(self, pre_config=None) -> (str, int):
         """
@@ -384,11 +403,15 @@ class Client:
         self.udp_thread.start()
 
     def listen_for_udp(self):
-        while True:
+        while not self.stop_udp_thread:
             data, addr = self.udp_sock.recvfrom(1024)
             # print("Received data:", data)
             # print("From address:", addr)
             self.process_recv_data(data)
+
+    def stop_udp(self):
+        self.stop_udp_thread = True
+        self.udp_thread.join()
 
     def process_recv_data(self, data):
         data = json.loads(data)

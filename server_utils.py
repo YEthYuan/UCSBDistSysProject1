@@ -15,7 +15,8 @@ class Server:
         self.routes = self.get_routes(config)
 
         self.balances = self.init_balance_dict(config)
-        
+
+        self.stop_udp_thread = False
         self.my_addr = self.get_my_ip_port(self.config)
         self.host, self.port = self.my_addr
         self.init_udp_recv_settings()
@@ -23,6 +24,8 @@ class Server:
 
     def reset_balances(self):
         self.balances = self.init_balance_dict(self.config)
+        print("Balance table have been reset!")
+        self.print_balance()
 
     def get_routes(self, config: dict) -> dict:
         ret = {}
@@ -43,7 +46,7 @@ class Server:
     def init_balance_dict(self, config: dict) -> dict:
         ret = {}
         for item in config['clients']:
-            ret[item['username']] = 10
+            ret[item['username']] = item['balance']
 
         return ret
 
@@ -128,7 +131,7 @@ class Server:
         print(f"Transact replied to {S}")
 
     def listen_for_udp(self):
-        while True:
+        while not self.stop_udp_thread:
             data, addr = self.udp_sock.recvfrom(1024)
             # print("Received data:", data)
             # print("From address:", addr)
@@ -180,6 +183,10 @@ class Server:
         # Start the thread to listen for UDP packets
         self.udp_thread = threading.Thread(target=self.listen_for_udp)
         self.udp_thread.start()
+
+    def stop_udp(self):
+        self.stop_udp_thread = True
+        self.udp_thread.join()
 
 
 if __name__ == '__main__':

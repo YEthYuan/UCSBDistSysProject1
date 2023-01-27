@@ -4,6 +4,8 @@ import sys
 from client_utils import Client
 from utils import *
 
+
+
 def main():
     config_path = input("Input the path of config file: [./config.yaml]")
     if config_path == "":
@@ -29,12 +31,14 @@ def main():
     client = Client(pid=pid, username=username, config=config)
 
     while True:
-        os.system('clear') # for linux/macOS
-        # os.system('cls') for Windows
+        clear_screen()
         print(f" --- Client {username} Interface --- \n")
+        print(f" < PID: {pid}   clock: {client.get_current_clock()} > ")
         print("1. Get Current Balance")
         print("2. Make Transaction")
         print("3. Print the Current Blockchain")
+        print()
+        print("9: [DEBUG] Change My Clock")
         print("0. Exit")
         choice = input("Enter your choice: ")
 
@@ -55,7 +59,13 @@ def main():
             print('=' * 30)
             print("Press enter to continue. ")
             input()
+        elif choice == '9':
+            client.print_blockchain()
+            print('=' * 30)
+            print("Press enter to continue. ")
+            input()
         elif choice == '0':
+            client.stop_udp()
             print("Bye!")
             exit(1)
         else:

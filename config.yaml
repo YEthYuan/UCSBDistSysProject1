@@ -5,10 +5,13 @@ clients:
   - ip: 127.0.0.1
     username: Amy
     port: 8001
+    balance: 10
   - ip: 127.0.0.1
     username: Bob
     port: 8002
+    balance: 10
   - ip: 127.0.0.1
     username: Cindy
     port: 8003
+    balance: 10
 
