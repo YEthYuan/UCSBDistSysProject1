@@ -71,7 +71,8 @@ def main():
             print("Press enter to continue. ")
             input()
         elif choice == '9':
-            client.print_blockchain()
+            new_clock = input("Set my clock to: ")
+            client.manually_modify_clock(int(new_clock))
             print('=' * 30)
             print("Press enter to continue. ")
             input()
