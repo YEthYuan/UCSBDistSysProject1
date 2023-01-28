@@ -27,7 +27,7 @@ def main():
     pid = os.getpid()
 
     # sleep=-1 := sleep=rand(0,3)
-    client = Client(pid=pid, username=username, config=config, sleep=-1)
+    client = Client(pid=pid, username=username, config=config, sleep=3)
 
     while True:
         clear_screen()

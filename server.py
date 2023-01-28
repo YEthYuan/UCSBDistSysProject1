@@ -11,7 +11,7 @@ def main():
     config = load_internet_config(config_path)
 
     # sleep=-1 := sleep=rand(0,3)
-    server = Server(config, sleep=-1)
+    server = Server(config, sleep=3)
 
     while True:
         clear_screen()
