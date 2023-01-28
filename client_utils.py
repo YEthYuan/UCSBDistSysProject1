@@ -13,8 +13,9 @@ from utils import *
 
 class Client:
     def __init__(self, pid: int, username: str, config: dict, sleep=0):
+        self.reply_list = {}
         self.bank_addr = None
-        self.broadcast_list = None
+        self.broadcast_list = []
         self.data_queue = None
         self.udp_thread = None
         self.udp_sock = None
@@ -30,6 +31,7 @@ class Client:
         self.clock = 0
         self.balance = 0
         self.set_balance(config)
+        self.routes = self.get_routes(config)
 
         self.stop_udp_thread = False
         self.my_addr = self.get_my_ip_port(config)
@@ -63,13 +65,32 @@ class Client:
         self.broadcast_request(my_new_block)
         self.insert_into_chain(my_new_block)
 
-        # # wait for a while for potential requests sent by other users
-        time.sleep(0.2)
-
+        self.wait_for_all_replies()
+        print("[Prerequisite 1 met] All replies have received!")
+        self.wait_to_be_queue_head()
+        print("[Prerequisite 2 met] At the head of queue now!")
         # self.print_blockchain()
+
+        self.send_transaction_request(transact)
+
+    def wait_for_all_replies(self):
+        while not all(self.reply_list.values()):
+            pass
+
+    def wait_to_be_queue_head(self):
         while self.blockchain[self.block_step]['pid'] != self.pid:
             pass
-        self.send_transaction_request(transact)
+
+    def reset_reply_list(self):
+        for k, v in self.reply_list.items():
+            self.reply_list[k] = False
+
+    def get_routes(self, config: dict) -> dict:
+        ret = {}
+        for c in config['clients']:
+            ret[c['username']] = (c['ip'], c['port'])
+
+        return ret
 
     def init_blockchain(self) -> list:
         ret = []
@@ -184,10 +205,10 @@ class Client:
         return ret
 
     def config_internet(self, config: dict) -> dict:
-        self.broadcast_list = []
         for client in config['clients']:
             if self.username != client['username']:
                 self.broadcast_list.append(client)
+                self.reply_list[client['username']] = False
 
         self.bank_addr = (config['server']['ip'], config['server']['port'])
 
@@ -247,7 +268,7 @@ class Client:
         """
         Packet definition:
         packet = {
-            'type': c->c: ['client-request', 'client-release']
+            'type': c->c: ['client-request', 'client-reply'， 'client-release']
                     c->s: ['client-balreq', 'client-transact']
                     s->c: ['server-balance', 'server-status']
             'item': str (can be a dumped json string)
@@ -351,6 +372,7 @@ class Client:
             sock.close()
 
     def broadcast_request(self, block: dict):
+        self.reset_reply_list()
         payload = json.dumps(block)
         send_data = self.generate_packet_to_send(payload, 'client-request')
         send_data = json.dumps(send_data)
@@ -363,9 +385,13 @@ class Client:
             self.send_udp_packet(send_data, c['ip'], c['port'])
             print(f"Request sent to {c['username']}.")
 
-    def process_request(self, payload: dict):
+    def process_request(self, payload: dict, sender: str):
         self.insert_into_chain(payload)
         self.update_my_clock(max(payload['timestamp'], self.clock) + 1)
+        self.update_my_clock(self.clock+1)
+        target_addr = self.routes[sender]
+        self.send_reply(target_addr)
+        print(f"Reply sent to {sender}.")
 
     def broadcast_release(self, release_payload: dict):
         self.update_block_step()
@@ -393,6 +419,29 @@ class Client:
 
         self.update_my_clock(max(payload['timestamp'], self.clock) + 1)
         self.update_block_step()
+
+    def send_reply(self, addr):
+        payload = {
+            'timestamp': self.clock,
+            'pid': self.pid,
+            'username': self.username
+        }
+        payload = json.dumps(payload)
+        send_data = self.generate_packet_to_send(payload, 'client-reply')
+        send_data = json.dumps(send_data)
+        if self.sleep == -1:
+            sleep_time = random.uniform(0, 3)
+            time.sleep(sleep_time)
+        elif self.sleep:
+            time.sleep(self.sleep)
+        self.send_udp_packet(send_data, *addr)
+
+    def process_reply(self, payload: dict):
+        sender = payload['username']
+        sender_ts = payload['timestamp']
+        sender_pid = payload['pid']
+        self.reply_list[sender] = True
+        self.update_my_clock(max(sender_ts, self.clock) + 1)
 
     def send_balance_inquery(self, prompt=True):
         payload = {
@@ -488,7 +537,12 @@ class Client:
             print(f"==>Received request data from another client {data['from']}.")
             payload = data['item']
             payload = json.loads(payload)
-            self.process_request(payload)
+            self.process_request(payload, sender=data['from'])
+        elif data['type'] == 'client-reply':
+            print(f"==>Got reply from another client {data['from']}.")
+            payload = data['item']
+            payload = json.loads(payload)
+            self.process_reply(payload)
         elif data['type'] == 'client-release':
             print(f"==>Client {data['from']} sent you a release.")
             payload = data['item']
