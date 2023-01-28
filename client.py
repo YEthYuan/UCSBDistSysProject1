@@ -22,13 +22,12 @@ def main():
         else:
             print("Input Username Must in the configuration file! Press enter to continue.")
             input()
-            os.system('clear')  # for linux/macOS
-            # os.system('cls') for Windows
+            clear_screen()
 
     pid = os.getpid()
 
     # sleep=-1 := sleep=rand(0,3)
-    client = Client(pid=pid, username=username, config=config, sleep=-1)
+    client = Client(pid=pid, username=username, config=config, sleep=3)
 
     while True:
         clear_screen()

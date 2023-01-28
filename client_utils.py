@@ -62,6 +62,10 @@ class Client:
         my_new_block = self.generate_block(transact=transact, prev_hash="")
         self.broadcast_request(my_new_block)
         self.insert_into_chain(my_new_block)
+
+        # # wait for a while for potential requests sent by other users
+        time.sleep(0.2)
+
         # self.print_blockchain()
         while self.blockchain[self.block_step]['pid'] != self.pid:
             pass
